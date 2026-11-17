@@ -100,12 +100,21 @@ def _builder_start():
     return name
 
 
+# On a Mac without Docker: JIELI_WINE=<wine binary> runs JieLi's Windows toolchain 2.5.3 (the same clang 4.0.1 for
+# pi32v2) from JIELI_WIN_BIN (its pi32/bin) instead of the Linux one.
+WINE = os.environ.get("JIELI_WINE")
+WIN_TOOLS = {"pi32v2/bin/clang": "clang.exe", "pi32v2/bin/ld": "pi32v2-ld.exe",
+             "common/bin/objcopy": "llvm-objcopy.exe", "common/bin/objdump": "llvm-objdump.exe"}
+
+
 def tc(tool, *args):
     """run a toolchain binary (pi32v2/bin/..., common/bin/...) with cwd SRC; paths relative to SRC"""
     rel = [str(Path(a).resolve().relative_to(SRC)) if isinstance(a, Path) else a for a in args]
     if tool == "cc":                # the toolchain's cc wrapper needs python3; call clang directly
         tool, rel = "pi32v2/bin/clang", ["-target", "pi32v2", *rel]
-    if use_docker():
+    if WINE:
+        cmd = [WINE, str(Path(os.environ["JIELI_WIN_BIN"]) / WIN_TOOLS[tool]), *rel]
+    elif use_docker():
         cmd = ["docker", "exec", "-w", "/work", builder(), f"/opt/jieli/{tool}", *rel]
     else:
         cmd = [str(toolchain() / tool), *rel]
